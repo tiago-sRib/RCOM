@@ -2,7 +2,7 @@
 #include "aux.h"
 
 // global var
-int fd, attempts=1, timeoutFLAG=1, flag_alarm=0;
+int fd, attempts=1, timeoutFLAG=1;
 struct termios oldtio,newtio;
 
 void atende();
@@ -32,7 +32,7 @@ int llopen(linkLayer connectionParameters)
     int state = START_STATE;
     ssize_t res;
 
-    int i;
+    //int i;
     
     fd = llopenfd(connectionParameters);
     if(fd == -1){
@@ -59,11 +59,9 @@ int llopen(linkLayer connectionParameters)
             res = read(fd, &x, 1);
             
             if(res == 0 && timeoutFLAG){
-                printf("trigger alarm\n");
                 alarm(connectionParameters.timeOut);
                 timeoutFLAG = 0;
                 write(fd, buf, 5);
-                i=0;
             }
 
             if(res)
@@ -75,27 +73,25 @@ int llopen(linkLayer connectionParameters)
                 printFLAGS(x);
                 printf("-> ");
                 state = StateMachine(x, state); 
-                printf("\n");
-                i++;
             }   
+        }
+        if(attempts > connectionParameters.numTries){
+                puts("Number of tries exceded");
+                exit(-1);
         }
     }
 
     if (connectionParameters.role == RECEIVER)
     {
         printf("Receiving Mode\n");
-        i = 0;
+        
         while(state != STOP_STATE)
         {
-            if(i==0) sleep(connectionParameters.timeOut*2.5);
-
             read(fd, &x, 1);
-            printf("[%d]st: ", state);
-            printFLAGS(x);
-            printf("-> ");
+            //printf("[%d]st: ", state);
+            //printFLAGS(x);
+            //printf("-> ");
             state = StateMachine(x, state);
-            printf("\t%d\n", i);
-            i++;
         }
 
         createPkg("UA", buf);
@@ -116,7 +112,13 @@ int llread(char* packet)
 }
 
 int llclose(int showStatistics)
-{
+{   
+    if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
+      perror("tcsetattr");
+      exit(-1);
+    }
+
+    close(fd);
     return 0;
 }
 

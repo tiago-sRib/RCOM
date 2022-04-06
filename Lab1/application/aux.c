@@ -58,7 +58,7 @@ int StateMachine(unsigned char tx, int state)
             break; 
     }
 
-    printf("Going to [%d]st", state);
+    //printf("Going to [%d]st\n", state);
     return state;
 }
 
