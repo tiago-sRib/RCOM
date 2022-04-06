@@ -4,7 +4,7 @@
 #define FLAG 0x7E
 #define A 0x03
 #define C 0x03
-#define BCC A^C
+#define BCC (A^C)
 
 #define START_STATE 0
 #define FLAG_STATE  1
@@ -19,4 +19,5 @@ int get_baud(int baud);
 void printFLAGS(unsigned char x);
 void createPkg(char *mode, unsigned char * pkg);
 void atende();
+int llopenfd (linkLayer connectionParameters);
 #endif
