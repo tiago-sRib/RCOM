@@ -2,13 +2,13 @@
 #include "aux.h"
 
 // global var
-int flag=1, conta=1, state;
-int fd;
+int fd, attempts=1, timeoutFLAG=1;
 
-void alarme(int timeout, int tries);
-void atende(); //aux_alarme
+void atende();
 int get_baud(int baud);
-void printf_FLAGS(unsigned char x);
+void printFLAGS(unsigned char x);
+void createPkg(char *mode, unsigned char * pkg);
+int StateMachine(unsigned char tx, int state);
 
 // Opens a conection using the "port" parameters defined in struct linkLayer, returns "-1" on error and "1" on sucess
 int llopen(linkLayer connectionParameters);
@@ -19,40 +19,21 @@ int llread(char* packet);
 // Closes previously opened connection; if showStatistics==TRUE, link layer should print statistics in the console on close
 int llclose(int showStatistics);
 
-//aux.h
-int StateMachine(unsigned char tx, int state);
 
 //funtions
-/****************ALARME**************************/
-void atende()                   // atende alarme
+void atende()                 // atende alarme
 {
- 	printf("alarme # %d\n", conta);
-	flag=1;
-	conta++;
+ 	printf("alarme # %d\n", attempts);
+    timeoutFLAG=1;
+    attempts++;
 }
-
-void alarme(int timeout, int tries)
-{
-    (void) signal(SIGALRM, atende);             // instala  rotina que atende interrupcao
-
-    while(conta <= tries)
-    {
-        if(flag)        {alarm(timeout); flag=0;}     // activa alarme de 3s 
-    }
-
-    printf("Vou terminar.\n");
-}
-/************************************************/
-//por a alarm(0) para cancelar
 
 int llopen(linkLayer connectionParameters)
 {
     struct termios oldtio,newtio;
-    unsigned char buf[255];
     unsigned char UA[5];
     unsigned char SET[5];
-    //(void) signal(SIGALRM, atende);
-    int STOP;
+    int state = START_STATE;
     ssize_t res;
 
     int i, j;
@@ -78,8 +59,8 @@ int llopen(linkLayer connectionParameters)
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
-    newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */
+    newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 0;   /* blocking read until 1 chars received */
 
     tcflush(fd, TCIOFLUSH);
 
@@ -90,65 +71,71 @@ int llopen(linkLayer connectionParameters)
 
     if ((connectionParameters.role != TRANSMITTER) && (connectionParameters.role != RECEIVER))
     {
-        printf("ERROR, MUST BE 0 OR 1\n");
+        printf("ERROR CONNECTING, MUST BE 0 OR 1\n");
         exit(-1);
     }
 
     if (connectionParameters.role == TRANSMITTER)
     {
         printf ("Transmitting Mode\n");
-        SET[0] = FLAG;  
-        SET[1] = A;
-        SET[2] = C;
-        SET[3] = BCC;
-        SET[4] = FLAG;
-        write(fd, SET, 5);
-        //alarme(connectionParameters.timeOut, connectionParameters.numTries);
-    
-        i=0;
-        while (state != STOP_STATE)
+        createPkg("SET", SET);
+        (void) signal(SIGALRM, atende);
+
+        while (attempts <= connectionParameters.numTries)
         {
-            
-            res = read(fd, &UA[i], 1);
+            write(fd, SET, 5);
 
-            if(res != 0 || flag == 0)        //pkg recieved
-                //alarm(0);  
+            i=0;
+            while (state != STOP_STATE)
+            {    
+                res = read(fd, &UA[i], 1);
 
-            printf("No meio da virtude\n");                     
+                if(res == 0 && timeoutFLAG)
+                {
+                    printf("trigger alarm\n");
+                    alarm(connectionParameters.timeOut);
+                    timeoutFLAG = 0;
+                }
 
-            if(res == 0     || flag == 1)
-                write(fd, SET, 5);              //falta encerrar o programa ao fim de tres tentativas
+                if(res != 0)
+                {
+                    alarm(0);                    //pkg recieved
+                
+                    printf("[%d]st: ", state);
+                    printFLAGS(UA[i]);
+                    printf("-> ");
+                    state = StateMachine(UA[i], state); 
 
-            printf("[%d]st: ", state);
-            printf_FLAGS(UA[i]);
-            printf("-> ");
-            StateMachine(UA[i], state);
-            i++;
+                    i++;
+                }            
+            }
+        }
+
+        if(0){
+                puts("numTries exceded");
+                exit(-1);
         }
     }
-    
+
     if (connectionParameters.role == RECEIVER)
     {
         printf("Receiving Mode\n");
-        j = 0;
+        i = 0;
         while(state != STOP_STATE)
         {
-            //printf("ANTES READ\n");
-            read(fd, &SET[j], 1);
+            if(i==0) sleep(connectionParameters.timeOut*2);
+
+            read(fd, &SET[i], 1);
             printf("[%d]st: ", state);
-            printf_FLAGS(SET[j]);
+            printFLAGS(SET[i]);
             printf("-> ");
-            StateMachine(SET[j], state);
-            j++;
+            state = StateMachine(SET[i], state);
+            i++;
         }
+
+        createPkg("UA", UA);
         write(fd, UA, 5);
     }
-    else
-    {
-        printf("ERROR CONNECTING\n");
-        exit(-1);
-    }
-
 
     return 1;
 }
@@ -166,7 +153,7 @@ int StateMachine(unsigned char tx, int state)
             if(tx == A){
                 state = A_STATE;
             }
-            else if(tx == FLAG){
+            else if(tx == FLAG){    
                 state = FLAG_STATE;
             }
             else state = START_STATE;
@@ -222,7 +209,7 @@ int llclose(int showStatistics)
     return 0;
 }
 
-void printf_FLAGS(unsigned char x){
+void printFLAGS(unsigned char x){
     switch (x)
     {
     case FLAG:
@@ -235,11 +222,10 @@ void printf_FLAGS(unsigned char x){
         printf("A/C");
         break;
     default:
-        printf("%i", x);
+        printf("%u", x);
         break;
     }
 }
-
 
 int get_baud(int baud)
 {
@@ -282,5 +268,17 @@ int get_baud(int baud)
         return B4000000;
     default: 
         return -1;
+    }
+}
+
+
+void createPkg(char *mode, unsigned char * pkg)
+{
+    if(strcmp("SET", mode) == 0 || strcmp("UA", mode) == 0){
+        pkg[0] = FLAG;  
+        pkg[1] = A;
+        pkg[2] = C;
+        pkg[3] = BCC;
+        pkg[4] = FLAG; 
     }
 }
