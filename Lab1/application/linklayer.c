@@ -68,10 +68,9 @@ int llopen(linkLayer connectionParameters)
             {
                 alarm(0);             //pkg recieved
 
-        
-                printf("[%d]st: ", state);
-                printFLAGS(x);
-                printf("-> ");
+                //printf("[%d]st: ", state);
+                //printFLAGS(x);
+                //printf("-> ");
                 state = StateMachine(x, state); 
             }   
         }
