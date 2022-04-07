@@ -2,7 +2,7 @@
 #include "aux.h"
 
 // global var
-int fd, attempts=1, timeoutFLAG=1;
+int fd, attempts=1, timeoutFLAG=1; // numTries, timeOut; ?? 
 struct termios oldtio,newtio;
 
 void atende();
@@ -66,11 +66,10 @@ int llopen(linkLayer connectionParameters)
 
             if(res)
             {
-                alarm(0);             //pkg recieved
-
-                //printf("[%d]st: ", state);
-                //printFLAGS(x);
-                //printf("-> ");
+                alarm(0);
+                printf("[%d]st: ", state);
+                printFLAGS(x);
+                printf("-> ");
                 state = StateMachine(x, state); 
             }   
         }
@@ -87,9 +86,9 @@ int llopen(linkLayer connectionParameters)
         while(state != STOP_STATE)
         {
             read(fd, &x, 1);
-            //printf("[%d]st: ", state);
-            //printFLAGS(x);
-            //printf("-> ");
+            printf("[%d]st: ", state);
+            printFLAGS(x);
+            printf("-> ");
             state = StateMachine(x, state);
         }
 
@@ -101,8 +100,42 @@ int llopen(linkLayer connectionParameters)
 }
 
 int llwrite(char* tx, int txSize)
-{
+{   
     return 0;
+
+    unsigned char x;
+    int state = START_STATE;
+    ssize_t res;
+    attempts = 1;
+
+    (void) signal(SIGALRM, atende);
+
+    write(fd, tx, txSize);
+    while (state != STOP_STATE){
+        
+
+        res = read(fd, &x, 1);
+        
+        if(res == 0 && timeoutFLAG){
+            alarm(3);
+            timeoutFLAG = 0;
+            write(fd, tx, txSize);
+        }
+
+        if(res)
+        {
+            alarm(0);             //pkg recieved
+
+            //printf("[%d]st: ", state);
+            //printFLAGS(x);
+            //printf("-> ");
+            state = StateMachine(x, state); 
+        }   
+    }
+    if(attempts > 3){
+            puts("Number of tries exceded");
+            exit(-1);
+    }
 }
 
 int llread(char* packet)
