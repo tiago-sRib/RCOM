@@ -1,8 +1,8 @@
 CC = gcc
-C_FLAGS = -g -Wall -pipe
+C_FLAGS = -g -Wall
 
 gcc:
-	$(CC) $(C_FLAGS) linklayer.c aux.c -c
+	$(CC) $(C_FLAGS) -c linklayer.c aux.c
 	$(CC) main.c linklayer.o aux.o -o app
 
 tx:
@@ -10,6 +10,12 @@ tx:
 
 rx:
 	./app /dev/ttyS11 rx penguin-recieved.gif
+
+txlab:
+	./app /dev/ttyS0 tx penguin.gif
+
+rxlab:
+	./app /dev/ttyS1 rx penguin-recieved.gif
 
 clear:
 	rm -f app a.out

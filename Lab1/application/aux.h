@@ -1,10 +1,22 @@
 #ifndef AUX
 #define AUX
 
+#define SET_pkg 1
+#define UA_pkg 2
+#define UA2_pkg 4
+#define DISC_pkg 3
+
 #define FLAG 0x7E
 #define A 0x03
-#define C 0x03
-#define BCC (A^C)
+#define A_2 0x01
+
+#define C_SET 0x03
+#define C_UA 0x07
+#define C_DISC 0x0b
+
+#define BCC_SET (A^C_SET)
+#define BCC_UA (A^C_UA)
+#define BCC_DISC (A^C_DISC)
 
 #define START_STATE 0
 #define FLAG_STATE  1
@@ -13,11 +25,23 @@
 #define BCC_STATE   4
 #define STOP_STATE  5
 
+typedef struct stats{
+    int role; //defines the role of the program: 0==Transmitter, 1=Receiver
+    int timeOuts;
+    int RecivedI;
+    int RetransmitedFrames;
+} stats;    
+
 // returns the current state
-int StateMachine(unsigned char tx, int state);
-int get_baud(int baud);
-void printFLAGS(unsigned char x);
-void createPkg(char *mode, unsigned char * pkg);
-void atende();
-int llopenfd (linkLayer connectionParameters);
+int StateMachineUA(unsigned char tx, int state);
+int StateMachineDISC(unsigned char tx, int state);
+int StateMachineSET(unsigned char tx, int state);
+int StateMachineUA2(unsigned char tx, int state);
+
+int getBaud(int baud);
+void printFlags(unsigned char x);
+void createPkg(unsigned int type, unsigned char * pkg);
+void timeOut();
+int connectionConfig(linkLayer connectionParameters);
+void llcopy(linkLayer connectionParameters);
 #endif

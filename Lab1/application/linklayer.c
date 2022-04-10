@@ -2,65 +2,50 @@
 #include "aux.h"
 
 // global var
-int fd, attempts=1, timeoutFLAG=1; // numTries, timeOut; ?? 
+int attempts=1, timeOutFLAG=1; // numTries, timeOut; ?? 
+int fd;
 struct termios oldtio,newtio;
-
-void atende();
-
-// Opens a conection using the "port" parameters defined in struct linkLayer, returns "-1" on error and "1" on sucess
-int llopen(linkLayer connectionParameters);
-// Sends data in tx with size txSize
-int llwrite(char* tx, int txSize);
-// Receive data in packet
-int llread(char* packet);
-// Closes previously opened connection; if showStatistics==TRUE, link layer should print statistics in the console on close
-int llclose(int showStatistics);
-
+linkLayer cP;
 
 //funtions
-void atende()                 // atende alarme
+void timeOut()
 {
- 	printf("alarme # %d\n", attempts);
-    timeoutFLAG=1;
+    printf("alarme # %d\n", attempts);
+    timeOutFLAG=1;
     attempts++;
 }
 
 int llopen(linkLayer connectionParameters)
 {
-    unsigned char x;
+    unsigned char b;
     unsigned char buf[5];
     int state = START_STATE;
-    ssize_t res;
 
-    //int i;
+    ssize_t res;
+    llcopy(connectionParameters);
     
-    fd = llopenfd(connectionParameters);
+    fd = connectionConfig(connectionParameters);
+
     if(fd == -1){
         puts("ERROR CONNECTING fd");
         return -1;
     }
 
-    if ((connectionParameters.role != TRANSMITTER) && (connectionParameters.role != RECEIVER))
+    switch (cP.role)
     {
-        printf("ERROR CONNECTING, MUST BE 0 OR 1\n");
-        exit(-1);
-    }
-
-    if (connectionParameters.role == TRANSMITTER)
-    {
-        printf ("Transmitting Mode\n");
-        createPkg("SET", buf);
-        (void) signal(SIGALRM, atende);
+    case TRANSMITTER:
+        createPkg(SET_pkg, buf);
+    
+        (void) signal(SIGALRM, timeOut);
 
         write(fd, buf, 5);
-        while (attempts <= connectionParameters.numTries && state != STOP_STATE){
+        while(attempts <= cP.numTries && state != STOP_STATE){
             
-
-            res = read(fd, &x, 1);
+            res = read(fd, &b, 1);
             
-            if(res == 0 && timeoutFLAG){
-                alarm(connectionParameters.timeOut);
-                timeoutFLAG = 0;
+            if(res == 0 && timeOutFLAG){
+                alarm(cP.timeOut);
+                timeOutFLAG = 0;
                 write(fd, buf, 5);
             }
 
@@ -68,74 +53,46 @@ int llopen(linkLayer connectionParameters)
             {
                 alarm(0);
                 printf("[%d]st: ", state);
-                printFLAGS(x);
+                printFlags(b);
                 printf("-> ");
-                state = StateMachine(x, state); 
+                state = StateMachineUA(b, state); 
             }   
         }
-        if(attempts > connectionParameters.numTries){
-                puts("Number of tries exceded");
-                exit(-1);
-        }
-    }
 
-    if (connectionParameters.role == RECEIVER)
-    {
-        printf("Receiving Mode\n");
-        
+        if(attempts > cP.numTries){
+            puts("Number of tries exceded");
+            exit(-1);
+        }
+        break;
+    
+    case RECEIVER:
+
         while(state != STOP_STATE)
         {
-            read(fd, &x, 1);
+            read(fd, &b, 1);
             printf("[%d]st: ", state);
-            printFLAGS(x);
+            printFlags(b);
             printf("-> ");
-            state = StateMachine(x, state);
+            state = StateMachineSET(b, state);
         }
 
-        createPkg("UA", buf);
+        createPkg(UA_pkg, buf);
         write(fd, buf, 5);
+        break;
+
+    default:
+        printf("ERROR CONNECTING, MUST BE 0 OR 1\n");
+        exit(-1);
+        break;
     }
 
+    sleep(1);
     return 1;
 }
 
 int llwrite(char* tx, int txSize)
 {   
     return 0;
-
-    unsigned char x;
-    int state = START_STATE;
-    ssize_t res;
-    attempts = 1;
-
-    (void) signal(SIGALRM, atende);
-
-    write(fd, tx, txSize);
-    while (state != STOP_STATE){
-        
-
-        res = read(fd, &x, 1);
-        
-        if(res == 0 && timeoutFLAG){
-            alarm(3);
-            timeoutFLAG = 0;
-            write(fd, tx, txSize);
-        }
-
-        if(res)
-        {
-            alarm(0);             //pkg recieved
-
-            //printf("[%d]st: ", state);
-            //printFLAGS(x);
-            //printf("-> ");
-            state = StateMachine(x, state); 
-        }   
-    }
-    if(attempts > 3){
-            puts("Number of tries exceded");
-            exit(-1);
-    }
 }
 
 int llread(char* packet)
@@ -145,16 +102,92 @@ int llread(char* packet)
 
 int llclose(int showStatistics)
 {   
-    if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
-      perror("tcsetattr");
-      exit(-1);
+    unsigned char b, buf[30];
+    int state = START_STATE;
+    ssize_t res;
+
+    switch (cP.role)
+    {
+    case TRANSMITTER:
+        createPkg(DISC_pkg, buf);
+
+        (void) signal(SIGALRM, timeOut);
+
+        write(fd, buf, 5);
+        while(attempts <= cP.numTries && state != STOP_STATE){
+            
+            res = read(fd, &b, 1);
+            
+            if(res == 0 && timeOutFLAG){
+                alarm(cP.timeOut);
+                timeOutFLAG = 0;
+                write(fd, buf, 5);
+            }
+
+            if(res)
+            {
+                alarm(0);
+                printf("[%d]st: ", state);
+                printFlags(b);
+                printf("-> ");
+                state = StateMachineDISC(b, state); 
+            }   
+        }
+
+        if(attempts > cP.numTries){
+            puts("Number of tries exceded");
+            exit(-1);
+        }
+
+        createPkg(UA2_pkg, buf);
+        write(fd, buf, 5);
+
+    break;
+
+    case RECEIVER:
+        while(state != STOP_STATE)
+        {
+            read(fd, &b, 1);
+            printf("[%d]st: ", state);
+            printFlags(b);
+            printf("-> ");
+            state = StateMachineDISC(b, state);
+        }
+
+        createPkg(DISC_pkg, buf);
+        write(fd, buf, 5);
+
+        state = START_STATE;
+        puts("DISC pkgs exchenged");
+        while(state != STOP_STATE)
+        {
+            read(fd, &b, 1);
+            printf("[%d]st: ", state);
+            printFlags(b);
+            printf("-> ");
+            state = StateMachineUA2(b, state);
+        }
+        puts("Everithing went smooth");
+    break;
+
+    
+    default:
+        exit(-1);
+        break;
     }
 
     close(fd);
+    sleep(1);
     return 0;
 }
 
-int llopenfd (linkLayer connectionParameters){
+void llcopy(linkLayer connectionParameters){
+    cP.role = connectionParameters.role;
+    cP.timeOut = connectionParameters.timeOut;
+    cP.numTries = connectionParameters.numTries;
+}
+
+int connectionConfig(linkLayer connectionParameters){
     fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY );
     if (fd <0) 
     {
@@ -169,15 +202,15 @@ int llopenfd (linkLayer connectionParameters){
     }
 
     bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = get_baud(connectionParameters.baudRate) | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = getBaud(connectionParameters.baudRate) | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
 
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
-    newtio.c_cc[VMIN]     = 0;   /* blocking read until 1 chars received */
+    newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */
 
     tcflush(fd, TCIOFLUSH);
 
