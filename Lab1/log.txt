@@ -8,4 +8,7 @@ ideia daquilo que é preciso fazer, depois digo coisas
 
 P.S no llclose vamos ter de pôr aquilo a dar as estatisticas depois de fazermos as outras funções
 
-[11 de abril]
+[15 de abril]
+    Está critico, esta merda num funfa
+
+    Deixei as StateMachines do I e do RR a meio, mas se calhar amanha ja dá para perceber o que está mal aqui 

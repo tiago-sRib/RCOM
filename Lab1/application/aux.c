@@ -1,7 +1,8 @@
 #include "linklayer.h"
 #include "aux.h"
 
-void printFlags(unsigned char x){
+void printFlags(unsigned char x)
+{
     switch (x)
     {
     case FLAG:
@@ -18,23 +19,43 @@ void printFlags(unsigned char x){
         break;
     case A:
         printf("A\\C");
-        break; 
+        break;
     case C_DISC:
         printf("C_DISC");
         break;
     case C_UA:
         printf("C_UA");
         break;
-    
+
     default:
         printf("%u*", x);
         break;
     }
 }
 
+void printInfoPkg(int size, unsigned char *pkg, unsigned char BCC2)
+{
+    for(int i = 0; i < size; i++)
+    {
+        if(pkg[i] == FLAG)  printf("[i:%d FLAG] ", i);
+
+        else if(pkg[i] == A)     printf("[i:%d A] ", i);
+
+        else if(pkg[i] == C_I(0) || pkg[i] == C_I(1) )    printf("[i:%d C] ", i);
+
+        else if(pkg[i] == (A^C_I(0)) || pkg[i] == (A^C_I(1)) ) printf("[i:%d BCC1] ", i);
+        
+        else if(pkg[i] == BCC2) printf("[i:%d BCC2] ", i);
+
+        else printf("[%u]", pkg[i]);
+    }
+    printf("\n");
+}
+
 int getBaud(int baud)
 {
-    switch (baud) {
+    switch (baud)
+    {
     case 9600:
         return B9600;
     case 19200:
@@ -77,287 +98,388 @@ int getBaud(int baud)
     }
 }
 
-void createPkg(unsigned int type, unsigned char * pkg)
+unsigned char * createPkg(unsigned int type)
 {
+    unsigned char * pkg = calloc(sizeof(unsigned char), 5);
+
     switch (type)
     {
     case SET_pkg:
-        pkg[0] = FLAG;  
+        pkg[0] = FLAG;
         pkg[1] = A;
         pkg[2] = C_SET;
         pkg[3] = BCC_SET;
-        pkg[4] = FLAG; 
+        pkg[4] = FLAG;
         break;
 
     case UA_pkg:
-        pkg[0] = FLAG;  
+        pkg[0] = FLAG;
         pkg[1] = A;
         pkg[2] = C_UA;
         pkg[3] = BCC_UA;
-        pkg[4] = FLAG; 
+        pkg[4] = FLAG;
         break;
 
     case UA2_pkg:
-        pkg[0] = FLAG;  
+        pkg[0] = FLAG;
         pkg[1] = A_2;
         pkg[2] = C_UA;
-        pkg[3] = A_2^C_UA;
-        pkg[4] = FLAG; 
+        pkg[3] = A_2 ^ C_UA;
+        pkg[4] = FLAG;
         break;
 
     case DISC_pkg:
-        pkg[0] = FLAG;  
+        pkg[0] = FLAG;
         pkg[1] = A;
         pkg[2] = C_DISC;
         pkg[3] = BCC_DISC;
-        pkg[4] = FLAG; 
-        break;
-    case RR_pkg:
-        pkg[0] = FLAG;  
-        pkg[1] = A;
-//      pkg[2] = Nr ^ 0b0100000;   //  Ns ^ 0b0000010
-        pkg[3] = A^pkg[2];
         pkg[4] = FLAG;
         break;
+    case RR_pkg:
+        pkg[0] = FLAG;
+        pkg[1] = A;
+        pkg[2] = C_RR(r);
+        pkg[3] = A ^ pkg[2];
+        pkg[4] = FLAG;
+        break;
+    case REJ_pkg:
+        
+        break;
     }
+
+    return pkg;
 }
 
 int StateMachineSET(unsigned char tx, int state)
-{   
-    switch(state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
+        break;
 
-        case FLAG_STATE:      
-            if(tx == A)                 {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case FLAG_STATE:
+        if (tx == A)
+            state = A_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case A_STATE:
-            if(tx == C_SET)             {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case A_STATE:
+        if (tx == C_SET)
+            state = C_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case C_STATE:
-            if(tx == BCC_SET)           {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case C_STATE:
+        if (tx == BCC_SET)
+            state = BCC_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
+        else
+            state = START_STATE;
+        break;
 
-        case STOP_STATE:
-            break; 
+    case STOP_STATE:
+        break;
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }
 
 int StateMachineUA(unsigned char tx, int state)
-{   
-    switch(state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
+        break;
 
-        case FLAG_STATE:      
-            if(tx == A)                 {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case FLAG_STATE:
+        if (tx == A)
+            state = A_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case A_STATE:
-            if(tx == C_UA)              {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case A_STATE:
+        if (tx == C_UA)
+            state = C_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case C_STATE:
-            if(tx == BCC_UA)            {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case C_STATE:
+        if (tx == BCC_UA)
+            state = BCC_STATE;
+    
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = FLAG_STATE;}
-            break;
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
 
-        case STOP_STATE:
-            break; 
+        else
+            state = START_STATE;
+        
+        break;
+
+    case STOP_STATE:
+        break;
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }
 
 int StateMachineUA2(unsigned char tx, int state)
-{   
-    switch(state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
+        break;
 
-        case FLAG_STATE:      
-            if(tx == A_2)               {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case FLAG_STATE:
+        if (tx == A_2)
+            state = A_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case A_STATE:
-            if(tx == C_UA)              {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}
-            break;
+    case A_STATE:
+        if (tx == C_UA)
+            state = C_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case C_STATE:
-            if(tx == (A_2^C_UA))        {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case C_STATE:
+        if (tx == (A_2 ^ C_UA))
+            state = BCC_STATE;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        else state = START_STATE;
+        break;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = FLAG_STATE;}
-            break;
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
+        else
+            state = START_STATE;
+        break;
 
-        case STOP_STATE:
-            break; 
+    case STOP_STATE:
+        break;
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }
 
 int StateMachineDISC(unsigned char tx, int state)
-{   
-    switch(state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
 
-        case FLAG_STATE:      
-            if(tx == A)                 {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+        break;
 
-        case A_STATE:
-            if(tx == C_DISC)            {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}       
-            break;
+    case FLAG_STATE:
+        if (tx == A)
+            state = A_STATE;
+    
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
 
-        case C_STATE:
-            if(tx == BCC_DISC)          {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case A_STATE:
+        if (tx == C_DISC)
+            state = C_STATE;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = FLAG_STATE;}
-            break;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+    
+        break;
 
-        case STOP_STATE:
-            break; 
+    case C_STATE:
+        if (tx == BCC_DISC)
+            state = BCC_STATE;
+        
+        else if (tx == FLAG)
+        
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
+
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
+        
+        else
+            state = START_STATE;
+    
+        break;
+
+    case STOP_STATE:
+        break;
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }
 
-/*
- *  Esta state machine também verifica a paridade entre as tramas
- *  O parametro Nx corresponde ao bit de paridade anteriormente recebido,
- *  escrevendo, por recorrência o Nr correspondente
- *  Este valor só é corretamente extraído se for possível alcançar o STOP_STATE
- */
-int StateMachineRR(unsigned char tx, int state, unsigned char *Nx)
-{   
-    switch(state)
+
+int StateMachineI(unsigned char tx, int state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        break;
 
-        case FLAG_STATE:      
-            if(tx == A)                 {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case FLAG_STATE:
+        if (tx == A)
+            state = A_STATE;
+        
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
 
-        case A_STATE:
-            if(tx == C_DISC)            {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}       
-            break;
+    case A_STATE:
+        if (tx == C_I(0) || tx == C_I(1))
+            state = C_STATE;
 
-        case C_STATE:
-            if(tx == BCC_DISC)          {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        
+        break;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = FLAG_STATE;}
-            break;
+    case C_STATE:
+        if (tx == (A ^ C_I(1)) || tx == (A ^ C_I(0)) )
+            state = BCC_STATE;
+        
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
 
-        case STOP_STATE:
-            break; 
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = DATA_STATE;
+        
+        break;
+
+    case DATA_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
+        
+        break;
+    case STOP_STATE:
+        break;
+
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }
 
-int StateMachineI(unsigned char tx, int state, unsigned char *Nx)
-{   
-    switch(state)
+int StateMachineRR_REJ(unsigned char tx, int state)
+{
+    switch (state)
     {
-        case START_STATE: 
-            if(tx == FLAG)              {state = FLAG_STATE;}
-            break;
+    case START_STATE:
+        if (tx == FLAG)
+            state = FLAG_STATE;
 
-        case FLAG_STATE:      
-            if(tx == A)                 {state = A_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+        break;
 
-        case A_STATE:
-            if(tx == C_DISC)            {state = C_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else                        {state = START_STATE;}       
-            break;
+    case FLAG_STATE:
+        if (tx == A)
+            state = A_STATE;
+    
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
 
-        case C_STATE:
-            if(tx == BCC_DISC)          {state = BCC_STATE;}
-            else if(tx == FLAG)         {state = FLAG_STATE;}
-            else state = START_STATE;
-            break;
+    case A_STATE:
+        if (tx == C_RR(0) || tx == C_RR(1))
+            state = C_STATE;
 
-        case BCC_STATE:
-            if(tx == FLAG)              {state = STOP_STATE;}
-            else                        {state = FLAG_STATE;}
-            break;
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+    
+        break;
 
-        case STOP_STATE:
-            break; 
+    case C_STATE:
+        if (tx == (A ^ C_RR(1)) || tx == (A ^ C_RR(0)) )
+            state = BCC_STATE;
+        
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
+
+    case BCC_STATE:
+        if (tx == FLAG)
+            state = STOP_STATE;
+        
+        else
+            state = START_STATE;
+    
+        break;
+
+    case STOP_STATE:
+        break;
     }
 
-    printf("Going to [%d]st\n", state);
     return state;
 }

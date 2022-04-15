@@ -2,8 +2,8 @@ CC = gcc
 C_FLAGS = -g -Wall
 
 gcc:
-	$(CC) $(C_FLAGS) -c linklayer.c aux.c
-	$(CC) main.c linklayer.o aux.o -o app
+	$(CC) $(C_FLAGS) -c linklayer.c aux.c data.c
+	$(CC) main.c linklayer.o aux.o data.o -o app
 
 tx:
 	./app /dev/ttyS10 tx penguin.gif

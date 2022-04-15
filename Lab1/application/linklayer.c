@@ -1,15 +1,11 @@
 #include "linklayer.h"
 #include "aux.h"
 
-// global var
-int attempts=1, timeOutFLAG=1; // numTries, timeOut; ?? 
+int attempts=1, timeOutFLAG=1;
 static int fd;
 struct termios oldtio,newtio;
 linkLayer cP;
 
-int C_I = 0b00, C_RR = 0b01;
-
-//funtions
 void timeOut()
 {
     printf("Alarm #%d\n", attempts);
@@ -20,7 +16,7 @@ void timeOut()
 int llopen(linkLayer connectionParameters)
 {
     unsigned char b;
-    unsigned char buf[5];
+    unsigned char * buf;
     int state = START_STATE;
 
     ssize_t res;
@@ -30,7 +26,7 @@ int llopen(linkLayer connectionParameters)
     switch (cP.role)
     {
     case TRANSMITTER:
-        createPkg(SET_pkg, buf);
+        buf = createPkg(SET_pkg);
     
         (void) signal(SIGALRM, timeOut);
 
@@ -48,16 +44,19 @@ int llopen(linkLayer connectionParameters)
             if(res)
             {
                 alarm(0);
-                printf("[%d]st: ", state);
+                printf("UA [%d]st: ", state);
                 printFlags(b);
                 printf("-> ");
                 state = StateMachineUA(b, state); 
+                printf("[%d]st\n", state);
+
             }   
         }
 
         if(attempts > cP.numTries){
             puts("Number of tries exceded");
             exit(-1);
+            free(buf);
         }
         break;
     
@@ -66,13 +65,14 @@ int llopen(linkLayer connectionParameters)
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("[%d]st: ", state);
+            printf("SET [%d]st: ", state);
             printFlags(b);
             printf("-> ");
             state = StateMachineSET(b, state);
+            printf("[%d]st\n", state);
         }
 
-        createPkg(UA_pkg, buf);
+        buf = createPkg(UA_pkg);
         write(fd, buf, 5);
         break;
 
@@ -81,82 +81,94 @@ int llopen(linkLayer connectionParameters)
         break;
     }
 
+    free(buf);
     sleep(1);
     return 1;
 }
 
 int llwrite(char* buf, int bufSize)
 {   
+
     if(buf == NULL)  exit(-1);
-    printf("\nllwrite(): \n");
     
     unsigned char * pkg = NULL;
     unsigned char b;
     int size, state = START_STATE;
     ssize_t res;
 
-    size = createInfoPkg((unsigned char *)buf, bufSize, C_I, pkg);
+    s = r;
+    pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
+    
+    printInfoPkg(size, pkg, -1);
+
     write(fd, pkg, size);
 
-    (void) signal(SIGALRM, timeOut);
-
-    while(attempts <= cP.numTries && state != STOP_STATE){
+    while(state != STOP_STATE){
         
         res = read(fd, &b, 1);
         
-        if(res == 0 && timeOutFLAG){
-            alarm(cP.timeOut);
-            timeOutFLAG = 0;
-            write(fd, pkg, 5);
-        }
+        printf("RR [%d]st: ", state);
+        printFlags(b);
+        printf("-> ");
+        state = StateMachineRR_REJ(b, state);
+        printf("[%d]st\n", state);
 
-        if(res)
-        {
-            alarm(0);
-            printf("[%d]st: ", state);
-            printFlags(b);
-            printf("-> ");
-            state = StateMachineUA(b, state); 
-        }   
     }   
 
-    free(pkg);
+    free(pkg); 
     return 0;
 }
 
 int llread(char* packet)
 {  
-    unsigned char buf[5], b;
+    unsigned char * buf;
     int state = START_STATE;
-    unsigned char Nr;
-    
-    
-    while(state != STOP_STATE)
-        {
-            read(fd, &b, 1);
-            printf("[%d]st: ", state);
-            printFlags(b);
-            printf("-> ");
-            
-            state = StateMachineRR(b, state, &Nr);
-        }
+    int i = 0, pkgSize, BCC2, BCC2_original;
+    unsigned char pkgRecieved[MAX_PAYLOAD_SIZE * 2];
 
-        buf[0] = FLAG;
-        buf[1] = A;
-        write(fd, buf, 5);
+    while(state != STOP_STATE)
+    {
+        read(fd, &pkgRecieved[i], 1);
+        printf("I [%d]st: ", state);
+        printFlags(pkgRecieved[i]);
+        printf("-> ");
+        
+        state = StateMachineI(pkgRecieved[i], state);
+        printf("[%d]st\n", state);
+
+        if(state == DATA_STATE)
+            i++;
+    }
+
+    pkgSize = i - 1;
+    BCC2 = pkgRecieved[pkgSize];
+    
+    stats.RecivedI++;
+
+    pkgSize = byte_destuffing(pkgRecieved, i, (unsigned char *) packet);
+    BCC2_original = createBCC2((unsigned char *) packet, pkgSize);
+    printf("BCC2 recebido: %u | BCC2 reconstruido: %u\n", BCC2, BCC2_original);
+    /*if(BCC2 != createBCC2((unsigned char *) packet, pkgSize))
+     */
+
+    r = 1 - s;
+    buf = createPkg(RR_pkg);
+    write(fd, buf, 5);
+    free(buf);
     return 0;
 }
 
 int llclose(int showStatistics)
 {   
-    unsigned char b, buf[30];
+    unsigned char * buf;
+    unsigned char b;
     int state = START_STATE;
     ssize_t res;
 
     switch (cP.role)
     {
     case TRANSMITTER:
-        createPkg(DISC_pkg, buf);
+        buf = createPkg(DISC_pkg);
 
         (void) signal(SIGALRM, timeOut);
 
@@ -174,34 +186,36 @@ int llclose(int showStatistics)
             if(res)
             {
                 alarm(0);
-                printf("[%d]st: ", state);
+                printf("DISC [%d]st: ", state);
                 printFlags(b);
                 printf("-> ");
-                state = StateMachineDISC(b, state); 
+                state = StateMachineDISC(b, state);
+                printf("[%d]st\n", state);
             }   
         }
 
         if(attempts > cP.numTries){
             puts("Number of tries exceded");
             exit(-1);
+            free(buf);
         }
 
-        createPkg(UA2_pkg, buf);
+        buf = createPkg(UA2_pkg);
         write(fd, buf, 5);
-
     break;
 
     case RECEIVER:
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("[%d]st: ", state);
+            printf("DISC [%d]st: ", state);
             printFlags(b);
             printf("-> ");
             state = StateMachineDISC(b, state);
+            printf("[%d]st\n", state);
         }
 
-        createPkg(DISC_pkg, buf);
+        buf = createPkg(DISC_pkg);
         write(fd, buf, 5);
 
         state = START_STATE;
@@ -209,32 +223,35 @@ int llclose(int showStatistics)
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("[%d]st: ", state);
+            printf("UA2 [%d]st: ", state);
             printFlags(b);
             printf("-> ");
             state = StateMachineUA2(b, state);
+            printf("[%d]st\n", state);
         }
         puts("Everithing went smooth");
     break;
 
-    
     default:
         exit(-1);
         break;
     }
 
     close(fd);
+    free(buf);
     sleep(1);
     return 0;
 }
 
-void llcopy(linkLayer connectionParameters){
+void llcopy(linkLayer connectionParameters)
+{
     cP.role = connectionParameters.role;
     cP.timeOut = connectionParameters.timeOut;
     cP.numTries = connectionParameters.numTries;
 }
 
-void connectionConfig(linkLayer connectionParameters){
+void connectionConfig(linkLayer connectionParameters)
+{
     fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY );
     if (fd <0) 
     {
@@ -256,8 +273,8 @@ void connectionConfig(linkLayer connectionParameters){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
-    newtio.c_cc[VMIN]     = 1;   /* blocking read until 1 chars received */
+    newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 0;   /* blocking read until 1 chars received */
 
     tcflush(fd, TCIOFLUSH);
 
@@ -265,85 +282,4 @@ void connectionConfig(linkLayer connectionParameters){
       perror("tcsetattr");
       exit(-1);
     }
-}
-
-int createInfoPkg(unsigned char * data, int sizeData, unsigned char Ns, unsigned char * pkg)
-{
-    int extraSize = 0, HEADER = 4, endPkg = 2;
-    int finalSize;
-    
-    for(int i = 0; i < sizeData; i++)
-    {
-        if(data[i] == FLAG || data[i] == ESC)
-            extraSize++;
-    }
-
-    finalSize = HEADER + endPkg + sizeData + extraSize;
-    pkg = calloc(sizeof(unsigned char), finalSize);
-    
-    Ns = 0b10;
-    pkg[0] = FLAG;
-    pkg[1] = A;
-    pkg[2] = C_I;
-    pkg[3] = A ^ pkg[2];
-    pkg[finalSize - 2] = createBCC2(data, sizeData);
-    pkg[finalSize - 1] = FLAG; 
-
-    byte_stuffing(data, sizeData, (pkg + 4));
-    
-    return finalSize;
-}
-
-int byte_stuffing(unsigned char *buf, int bufSize, unsigned char *newbuf)
-{
-    int counter = 0;
-    if ((!buf) || bufSize < 0 || !newbuf)
-    {
-        puts("ERROR IN BYTE STUFFING");
-        exit(-1);
-    }
-
-    for (int i=0; i<bufSize; i++)
-    {
-        if ((buf[i] == FLAG))
-        {
-            newbuf[i+counter] = ESC;
-            newbuf[i+counter+1] = (FLAG^STUFF);
-            counter++;
-        }
-        else if (buf[i] == ESC)
-        {
-            newbuf[i+counter] = ESC;
-            newbuf[i+counter+1] = (ESC^STUFF);
-            counter++;
-        }
-        else newbuf[i+counter] = buf[i];
-    }
-    
-    return 0;
-}
-
-int byte_destuffing(unsigned char *newBuf, int bufSize, unsigned char *buf)
-{
-    for (int i=0, newpos = 0; i<bufSize; i++, newpos++)
-    {
-        if (newBuf[i] == ESC)
-        {
-            if (newBuf[i+1] == (FLAG^STUFF)) 
-                buf[newpos] = FLAG;
-            else if (newBuf[i+1] == (ESC^STUFF))
-                buf[newpos] = ESC;
-        }
-        else buf[newpos] = newBuf[i];
-    }
-    return 0;
-}
-
-unsigned char createBCC2(unsigned char *data, int lenght)
-{
-    unsigned char buf = 0x00;
-    for (int i=0; i<lenght; i++)
-        buf ^= data[i];
-
-    return buf;
 }
