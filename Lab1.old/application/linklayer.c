@@ -87,88 +87,99 @@ int llopen(linkLayer connectionParameters)
 int llwrite(char* buf, int bufSize)
 {   
 
-    if(buf == NULL || bufSize > MAX_PAYLOAD_SIZE) 
-        exit(-1);
+    if(buf == NULL || bufSize > MAX_PAYLOAD_SIZE) exit(-1);
 
     unsigned char * pkg = NULL;
+    unsigned char * ucBuf = (unsigned char *)buf;
     unsigned char b;
     int size, state = START_STATE;
     ssize_t res;
-    //unsigned char Stuff[MAX_PAYLOAD_SIZE*2], deStuff[MAX_PAYLOAD_SIZE];
-    //int numErros = 0, StuffSize = 0, deStuffSize = 0;
+    unsigned char Stuff[MAX_PAYLOAD_SIZE*2], deStuff[MAX_PAYLOAD_SIZE];
+    int numErros = 0, StuffSize = 0, deStuffSize = 0;
     s = r;
     
-    pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
-    write(fd, pkg, size);
+
+    StuffSize = byte_stuffing(ucBuf, bufSize, Stuff);
+    deStuffSize = byte_destuffing(Stuff, StuffSize, deStuff);
+
+    if(deStuffSize != bufSize)
+        printf("Tamanhos nao coincidem: deSuff = %d, buf = %d\n", deStuffSize, bufSize);
+
+    for (int i=0; i<bufSize; i++)
+    {
+        if (ucBuf[i] != deStuff[i]){
+            numErros++;
+            printf("%u | %u [%d]\n", ucBuf[i], deStuff[i], i);
+        }
+            
+    }
+    printf("Numero de Erros: %d\n", numErros);
+    /*pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
     
+
+
+    //printInfoPkg(size, pkg, -1);
+
+    write(fd, pkg, size);
 
     while(state != STOP_STATE){
         
         res = read(fd, &b, 1);
         
-        //printf("RR [%d]st: ", state);
-        //printFlags(b);
-        //printf("-> ");
+        printf("RR [%d]st: ", state);
+        printFlags(b);
+        printf("-> ");
         state = StateMachineRR_REJ(b, state);
-        //printf("[%d]st\n", state);
+        printf("[%d]st\n", state);
 
     }   
-    
-    free(pkg); 
+
+    free(pkg); */
     return 0;
 }
 
 int llread(char* packet)
 {  
-    unsigned char buf[5], b;
+    unsigned char buf[5];
     int state = START_STATE;
-    int i = 0, pkgSize, deStuffSize, BCC2, BCC2_reconstruido;
+    int i = 0, pkgSize, BCC2, BCC2_original;
     unsigned char pkgRecieved[MAX_PAYLOAD_SIZE * 2];
     int res = 0, res_old = 0;
-    
+
     while(state != STOP_STATE && i < MAX_PAYLOAD_SIZE * 2)
     {
-        res += read(fd, &b, 1);
-        //printf("I [%d]st: ", state);
-        //printFlags(b);
-        //printf("-> ");
+        res += read(fd, &pkgRecieved[i], 1);
+        printf("I [%d]st: ", state);
+        printFlags(pkgRecieved[i]);
+        printf("-> ");
         
         if(res > res_old)
-        {
-            state = StateMachineI(b, state);
-
-            if(state == DATA_STATE)
-            {
-                pkgRecieved[i] = b;
-                i++;
-            }
-        }
-            
+            state = StateMachineI(pkgRecieved[i], state);
         
-        //printf("[%d]st\n", state);
+        printf("[%d]st\n", state);
+
+        if(state == DATA_STATE)
+            i++;
 
         res_old = res;
     }
 
-    BCC2 = pkgRecieved[i-1];
     pkgSize = i - 1;
+    BCC2 = pkgRecieved[pkgSize];
     
-    //stats.RecivedI++;
+    stats.RecivedI++;
 
 
-    deStuffSize = byte_destuffing(pkgRecieved, pkgSize, (unsigned char *) packet);
-    BCC2_reconstruido = createBCC2((unsigned char *) packet, deStuffSize);
-    
+    pkgSize = byte_destuffing(pkgRecieved, i, (unsigned char *) packet);
+    BCC2_original = createBCC2((unsigned char *) packet, pkgSize);
+    printf("BCC2 recebido: %u | BCC2 reconstruido: %u\n", BCC2, BCC2_original);
     if(BCC2 != createBCC2((unsigned char *) packet, pkgSize))
-    {
-        exit(-1);
-    }
-    
+     
 
     r = 1 - s;
     createPkg(RR_pkg, buf);
     write(fd, buf, 5);
-    return deStuffSize;
+    return 0;
 }
 
 int llclose(int showStatistics)
@@ -177,7 +188,7 @@ int llclose(int showStatistics)
     unsigned char b;
     int state = START_STATE;
     ssize_t res;
-    puts("entrou no close");
+
     switch (cP.role)
     {
     case TRANSMITTER:

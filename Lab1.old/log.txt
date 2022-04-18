@@ -1,0 +1,14 @@
+[Importante] llclose e llopen já estão feitos
+
+[9 de abril]
+    Apenas estive a ver os #defines das flags, dependendo das situações o A e o C podem adquirir valores diferentes (já tinhamos visto isso na aula),
+então criei StateMachines apropriadas a cada caso, nada de transcendente, mas tinha de ser feito
+    O llopen e o llclose, penso que estão feitos, são ambos muito parecidos, próximo passo é o llwrite. Estive a falar com o pessoal, já tenho uma
+ideia daquilo que é preciso fazer, depois digo coisas
+
+P.S no llclose vamos ter de pôr aquilo a dar as estatisticas depois de fazermos as outras funções
+
+[15 de abril]
+    Está critico, esta merda num funfa
+
+    Deixei as StateMachines do I e do RR a meio, mas se calhar amanha ja dá para perceber o que está mal aqui 

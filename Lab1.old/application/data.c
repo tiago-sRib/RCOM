@@ -3,13 +3,8 @@
 
 unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize)
 {
-    if (!data || sizeData > MAX_PAYLOAD_SIZE || !finalSize)
-    {
-        puts("Couldnt createInfoPkg");
-        exit(-1);
-    }
-
     int extraSize = 0;
+    unsigned char BCC2;
     unsigned char * pkg;
 
     for(int i = 0; i < sizeData; i++)
@@ -25,8 +20,11 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
     pkg[1] = A;
     pkg[2] = C_I(s);
     pkg[3] = (A ^ pkg[2]);
-    pkg[*finalSize - 2] = createBCC2(data, sizeData);
+    BCC2 = createBCC2(data, sizeData);
+    pkg[*finalSize - 2] = BCC2;
     pkg[*finalSize - 1] = FLAG; 
+
+    printf("Final Size: %d | sizeData: %d\n\n", *finalSize, sizeData);
 
     byte_stuffing(data, sizeData, (pkg + 4));
 
@@ -35,48 +33,39 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
 
 int byte_stuffing(unsigned char *buf, int bufSize, unsigned char *stuffedBuf)
 {
-    if (!buf || bufSize < 0 || !stuffedBuf || bufSize > MAX_PAYLOAD_SIZE)
+    if (!buf || bufSize < 0 || !stuffedBuf)
     {
         puts("Bad parameters in byte_stuffing()");
         exit(-1);
     }
     
-    int i, j = 0;
-
-    for (i=0; i< bufSize; i++)
+    int i, counter = 0, newpos;
+    for (i=0; i<bufSize; i++)
     {
+        newpos = i+counter;
         if ((buf[i] == FLAG))
         {
-            stuffedBuf[j] = ESC;
-            stuffedBuf[j+1] = (FLAG^STUFF);
-            j += 2; 
+            stuffedBuf[newpos] = ESC;
+            stuffedBuf[newpos+1] = (FLAG^STUFF);
+            counter++;
+            
         }
         else if (buf[i] == ESC)
         {
-            stuffedBuf[j] = ESC;
-            stuffedBuf[j+1] = (ESC^STUFF);
-            j += 2;
+            stuffedBuf[newpos] = ESC;
+            stuffedBuf[newpos+1] = (ESC^STUFF);
+            counter++;
         }
-        else 
-        {
-            stuffedBuf[j] = buf[i];
-            j++;
-        }
-        
+        else stuffedBuf[newpos] = buf[i];
     }
 
-    return j;
+    return newpos;
 }
 
 int byte_destuffing(unsigned char *stuffedBuf, int StuffSize, unsigned char *buf)
 {
-    if (!stuffedBuf || !buf || StuffSize > 2*MAX_PAYLOAD_SIZE)
-    {
-        puts("Bad parameters destuffing");
-        exit(-1);
-    }
     int i, newpos;
-    for (i=0, newpos = 0; i < StuffSize; i++, newpos++)
+    for (i=0; i<StuffSize; i++)
     {
         if (stuffedBuf[i] == ESC)
         {
@@ -84,24 +73,21 @@ int byte_destuffing(unsigned char *stuffedBuf, int StuffSize, unsigned char *buf
                 buf[newpos] = FLAG;
                 i++;
             }
+                
             else if (stuffedBuf[i+1] == (ESC^STUFF)){
                 buf[newpos] = ESC;
                 i++;  
             }
         }
         else buf[newpos] = stuffedBuf[i];
+        newpos++;
     }
+    
     return newpos;
 }
 
 unsigned char createBCC2(unsigned char *data, int lenght)
 {
-    if (!data || lenght < 0)
-    {
-        puts("Couldnt create BCC");
-        exit(-1);
-    }
-    
     unsigned char buf = 0x00;
     for (int i=0; i<lenght; i++)
         buf ^= data[i];
