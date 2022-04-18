@@ -159,7 +159,7 @@ int llread(char* packet)
     deStuffSize = byte_destuffing(pkgRecieved, pkgSize, (unsigned char *) packet);
     BCC2_reconstruido = createBCC2((unsigned char *) packet, deStuffSize);
     
-    if(BCC2 != createBCC2((unsigned char *) packet, pkgSize))
+    if(BCC2 != BCC2_reconstruido)
     {
         exit(-1);
     }
