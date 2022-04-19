@@ -41,7 +41,7 @@
 #define REJ_pkg 6
 
 /* Bits de paridade */
-static int s = 0, r = 0, cc = 2;
+static int s = 0, r = 0;
 
 typedef struct stats{
     int timeOuts;

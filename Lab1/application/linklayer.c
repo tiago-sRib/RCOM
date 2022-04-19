@@ -22,7 +22,7 @@ int llopen(linkLayer connectionParameters)
 
     llcopy(connectionParameters);
     connectionConfig(connectionParameters);
-    srand(time(NULL));
+
     switch (cP.role)
     {
     case TRANSMITTER:
@@ -30,23 +30,22 @@ int llopen(linkLayer connectionParameters)
     
         (void) signal(SIGALRM, timeOut);
 
-        write(fd, buf, 5);
         while(attempts <= cP.numTries && state != STOP_STATE){
             
             res += read(fd, &b, 1);
             
-            if(res == res_old && timeOutFLAG){
+            if(res == res_old && timeOutFLAG)
+            {
+                write(fd, buf, 5);
                 alarm(cP.timeOut);
                 timeOutFLAG = 0;
-                write(fd, buf, 5);
-                state = START_STATE;
-                res = res_old = 0;
             }
-
+            
             if(res > res_old)
             {
                 alarm(0);
                 state = StateMachineUA(b, state);
+                timeOutFLAG = 1;
             }   
 
             res_old = res;
@@ -92,17 +91,15 @@ int llwrite(char* buf, int bufSize)
     ssize_t res = 0, res_old = 0;
    
     s = r;
-    
+ 
     pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
-    write(fd, pkg, size);
-    
 
-    while(state != STOP_STATE ){
+    (void) signal(SIGALRM, timeOut);
         
+    attempts = timeOutFLAG = 1;
+    while(attempts <= cP.numTries && state != STOP_STATE)
+    {    
         res += read(fd, &b, 1);
-
-        if(res > res_old)
-            state = StateMachineRR_REJ(b, state);
         
         if(state == STOP_REJ_STATE)
         {
@@ -111,10 +108,31 @@ int llwrite(char* buf, int bufSize)
             write(fd, pkg, size);
             state = START_STATE;
         }
-            
+
+        else if(res > res_old)
+        {
+            alarm(0);
+            state = StateMachineRR_REJ(b, state);
+            timeOutFLAG = 1;
+        }
+        
+        else if(res == res_old && timeOutFLAG)
+        {
+            write(fd, pkg, size);
+            alarm(cP.timeOut);
+            timeOutFLAG = 0;
+        }
+        
         res_old = res;
     }   
     
+    if(attempts > cP.numTries)
+    {
+        puts("Number of tries exceded");
+        free(pkg);
+        exit(-1);
+    }
+
     free(pkg); 
     return 0;
 }
@@ -154,7 +172,6 @@ int llread(char* packet)
     
     if(BCC2 != BCC2_r)
     {
-        puts("REJ REJ SOCORRO");
         createPkg(REJ_pkg, buf);
         write(fd, buf, 5);
         return 0;
@@ -183,22 +200,26 @@ int llclose(int showStatistics)
 
         (void) signal(SIGALRM, timeOut);
 
-        write(fd, buf, 5);
+        attempts = timeOutFLAG = 1;
         while(attempts <= cP.numTries && state != STOP_STATE){
             
-            res = read(fd, &b, 1);
+            res += read(fd, &b, 1);
             
-            if(res == 0 && timeOutFLAG){
+            if(res == res_old && timeOutFLAG)
+            {
+                write(fd, buf, 5);
                 alarm(cP.timeOut);
                 timeOutFLAG = 0;
-                write(fd, buf, 5);
             }
 
-            if(res)
+            if(res > res_old)
             {
                 alarm(0);
                 state = StateMachineDISC(b, state);
-            }   
+                timeOutFLAG = 1;
+            }
+
+            res_old = res;
         }
 
         if(attempts > cP.numTries){
@@ -213,8 +234,12 @@ int llclose(int showStatistics)
     case RECEIVER:
         while(state != STOP_STATE)
         {
-            read(fd, &b, 1);
-            state = StateMachineDISC(b, state);
+            res += read(fd, &b, 1);
+            
+            if(res > res_old)
+                state = StateMachineDISC(b, state);
+
+            res_old = res;
         }
 
         createPkg(DISC_pkg, buf);
@@ -223,10 +248,14 @@ int llclose(int showStatistics)
         state = START_STATE;
         while(state != STOP_STATE)
         {
-            read(fd, &b, 1);
-            state = StateMachineUA2(b, state);
+            res += read(fd, &b, 1);
+            
+            if(res > res_old)
+                state = StateMachineUA2(b, state);
+        
+            res_old = res;
         }
-        puts("Everithing went smooth");
+        puts("Everything went smooth");
     break;
 
     default:
