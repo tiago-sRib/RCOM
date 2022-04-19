@@ -11,6 +11,7 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
 
     int extraSize = 0;
     unsigned char * pkg;
+    
 
     for(int i = 0; i < sizeData; i++)
     {
@@ -29,6 +30,27 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
     pkg[*finalSize - 1] = FLAG; 
 
     byte_stuffing(data, sizeData, (pkg + 4));
+    
+    
+    // testar o rej    
+    /*
+    unsigned char val;
+    int randPos[10];
+    if(cc > 0)
+    {
+        for(int i = 0; i < 10; i++)
+        {
+            randPos[i] = rand() % sizeData;
+
+            if(randPos[i] < 4) randPos[i] += 4;
+            val = rand();
+            pkg[randPos[i]] = val;
+
+            printf("%d: Pkg[%d] = %u\n", i, randPos[i], val);
+        }
+        cc--;
+    }  
+    */
 
     return pkg;
 }

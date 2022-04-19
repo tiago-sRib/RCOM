@@ -18,11 +18,11 @@ int llopen(linkLayer connectionParameters)
     unsigned char b;
     unsigned char buf[5];
     int state = START_STATE;
+    ssize_t res = 0, res_old = 0;
 
-    ssize_t res;
     llcopy(connectionParameters);
     connectionConfig(connectionParameters);
-
+    srand(time(NULL));
     switch (cP.role)
     {
     case TRANSMITTER:
@@ -33,30 +33,30 @@ int llopen(linkLayer connectionParameters)
         write(fd, buf, 5);
         while(attempts <= cP.numTries && state != STOP_STATE){
             
-            res = read(fd, &b, 1);
+            res += read(fd, &b, 1);
             
-            if(res == 0 && timeOutFLAG){
+            if(res == res_old && timeOutFLAG){
                 alarm(cP.timeOut);
                 timeOutFLAG = 0;
                 write(fd, buf, 5);
+                state = START_STATE;
+                res = res_old = 0;
             }
 
-            if(res)
+            if(res > res_old)
             {
                 alarm(0);
-                printf("UA [%d]st: ", state);
-                printFlags(b);
-                printf("-> ");
-                state = StateMachineUA(b, state); 
-                printf("[%d]st\n", state);
-
+                state = StateMachineUA(b, state);
             }   
+
+            res_old = res;
         }
 
         if(attempts > cP.numTries){
             puts("Number of tries exceded");
             exit(-1);
         }
+
         break;
     
     case RECEIVER:
@@ -64,11 +64,7 @@ int llopen(linkLayer connectionParameters)
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("SET [%d]st: ", state);
-            printFlags(b);
-            printf("-> ");
             state = StateMachineSET(b, state);
-            printf("[%d]st\n", state);
         }
 
         createPkg(UA_pkg, buf);
@@ -93,25 +89,30 @@ int llwrite(char* buf, int bufSize)
     unsigned char * pkg = NULL;
     unsigned char b;
     int size, state = START_STATE;
-    ssize_t res;
-    //unsigned char Stuff[MAX_PAYLOAD_SIZE*2], deStuff[MAX_PAYLOAD_SIZE];
-    //int numErros = 0, StuffSize = 0, deStuffSize = 0;
+    ssize_t res = 0, res_old = 0;
+   
     s = r;
     
     pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
     write(fd, pkg, size);
     
 
-    while(state != STOP_STATE){
+    while(state != STOP_STATE ){
         
-        res = read(fd, &b, 1);
-        
-        //printf("RR [%d]st: ", state);
-        //printFlags(b);
-        //printf("-> ");
-        state = StateMachineRR_REJ(b, state);
-        //printf("[%d]st\n", state);
+        res += read(fd, &b, 1);
 
+        if(res > res_old)
+            state = StateMachineRR_REJ(b, state);
+        
+        if(state == STOP_REJ_STATE)
+        {
+            //puts("Rej request recieved, sending pkg again");
+            //pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
+            write(fd, pkg, size);
+            state = START_STATE;
+        }
+            
+        res_old = res;
     }   
     
     free(pkg); 
@@ -120,18 +121,14 @@ int llwrite(char* buf, int bufSize)
 
 int llread(char* packet)
 {  
-    unsigned char buf[5], b;
+    unsigned char buf[5], b, pkgRecieved[MAX_PAYLOAD_SIZE * 2];
     int state = START_STATE;
-    int i = 0, pkgSize, deStuffSize, BCC2, BCC2_reconstruido;
-    unsigned char pkgRecieved[MAX_PAYLOAD_SIZE * 2];
-    int res = 0, res_old = 0;
+    int i = 0, pkgSize, deStuffSize, BCC2, BCC2_r;
+    ssize_t res = 0, res_old = 0;
     
     while(state != STOP_STATE && i < MAX_PAYLOAD_SIZE * 2)
     {
         res += read(fd, &b, 1);
-        //printf("I [%d]st: ", state);
-        //printFlags(b);
-        //printf("-> ");
         
         if(res > res_old)
         {
@@ -143,9 +140,6 @@ int llread(char* packet)
                 i++;
             }
         }
-            
-        
-        //printf("[%d]st\n", state);
 
         res_old = res;
     }
@@ -155,29 +149,33 @@ int llread(char* packet)
     
     //stats.RecivedI++;
 
-
     deStuffSize = byte_destuffing(pkgRecieved, pkgSize, (unsigned char *) packet);
-    BCC2_reconstruido = createBCC2((unsigned char *) packet, deStuffSize);
+    BCC2_r = createBCC2((unsigned char *) packet, deStuffSize);
     
-    if(BCC2 != BCC2_reconstruido)
+    if(BCC2 != BCC2_r)
     {
-        exit(-1);
+        puts("REJ REJ SOCORRO");
+        createPkg(REJ_pkg, buf);
+        write(fd, buf, 5);
+        return 0;
+    }
+
+    else
+    {
+        r = 1 - s;
+        createPkg(RR_pkg, buf);
+        write(fd, buf, 5);
     }
     
-
-    r = 1 - s;
-    createPkg(RR_pkg, buf);
-    write(fd, buf, 5);
     return deStuffSize;
 }
 
 int llclose(int showStatistics)
 {   
-    unsigned char buf[5];
-    unsigned char b;
+    unsigned char buf[5], b;
     int state = START_STATE;
-    ssize_t res;
-    puts("entrou no close");
+    ssize_t res = 0, res_old = 0;
+
     switch (cP.role)
     {
     case TRANSMITTER:
@@ -199,11 +197,7 @@ int llclose(int showStatistics)
             if(res)
             {
                 alarm(0);
-                printf("DISC [%d]st: ", state);
-                printFlags(b);
-                printf("-> ");
                 state = StateMachineDISC(b, state);
-                printf("[%d]st\n", state);
             }   
         }
 
@@ -220,26 +214,17 @@ int llclose(int showStatistics)
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("DISC [%d]st: ", state);
-            printFlags(b);
-            printf("-> ");
             state = StateMachineDISC(b, state);
-            printf("[%d]st\n", state);
         }
 
         createPkg(DISC_pkg, buf);
         write(fd, buf, 5);
 
         state = START_STATE;
-        puts("DISC pkgs exchenged");
         while(state != STOP_STATE)
         {
             read(fd, &b, 1);
-            printf("UA2 [%d]st: ", state);
-            printFlags(b);
-            printf("-> ");
             state = StateMachineUA2(b, state);
-            printf("[%d]st\n", state);
         }
         puts("Everithing went smooth");
     break;

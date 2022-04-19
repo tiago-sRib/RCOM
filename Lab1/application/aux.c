@@ -141,7 +141,11 @@ void createPkg(unsigned int type, unsigned char * pkg)
         pkg[4] = FLAG;
         break;
     case REJ_pkg:
-        
+        pkg[0] = FLAG;
+        pkg[1] = A;
+        pkg[2] = C_REJ(r);
+        pkg[3] = A ^ pkg[2];
+        pkg[4] = FLAG;
         break;
     }
 }
@@ -445,6 +449,9 @@ int StateMachineRR_REJ(unsigned char tx, int state)
         if (tx == C_RR(0) || tx == C_RR(1))
             state = C_STATE;
 
+        else if (tx == C_REJ(0) || tx == C_REJ(1))
+            state = C_REJ_STATE;
+
         else if (tx == FLAG)
             state = FLAG_STATE;
         
@@ -453,10 +460,12 @@ int StateMachineRR_REJ(unsigned char tx, int state)
     
         break;
 
+
+    /********************RR frame***********************/
     case C_STATE:
         if (tx == (A ^ C_RR(1)) || tx == (A ^ C_RR(0)) )
             state = BCC_STATE;
-        
+
         else if (tx == FLAG)
             state = FLAG_STATE;
         
@@ -472,9 +481,34 @@ int StateMachineRR_REJ(unsigned char tx, int state)
             state = START_STATE;
     
         break;
-
+    
     case STOP_STATE:
         break;
+    
+    /*********************REJ frame**********************/
+    case C_REJ_STATE:
+        if (tx == (A ^ C_REJ(1)) || tx == (A ^ C_REJ(0)) )
+            state = BCC_REJ_STATE;
+        
+        else if (tx == FLAG)
+            state = FLAG_STATE;
+        
+        else
+            state = START_STATE;
+        break;
+
+    case BCC_REJ_STATE:
+        if (tx == FLAG)
+            state = STOP_REJ_STATE;
+        
+        else
+            state = START_STATE;
+    
+        break;
+
+    case STOP_REJ_STATE:
+        break;
+    
     }
 
     return state;
