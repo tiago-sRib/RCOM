@@ -28,7 +28,7 @@
 #define BCC_STATE   4
 #define STOP_STATE  5
 #define DATA_STATE  6
-#define C_REJ_STATE   7
+#define C_REJ_STATE 7 
 #define BCC_REJ_STATE 8
 #define STOP_REJ_STATE 9
 
@@ -41,15 +41,19 @@
 #define REJ_pkg 6
 
 /* Bits de paridade */
-static int s = 0, r = 0;
+extern int parity_bit;
 
-typedef struct stats{
-    int timeOuts;
-    int RecivedI;
-    int RetransmitedFrames;
+typedef struct stats
+{
+    int numBytesStuff;
+    int numBytesFile;
+    int numREJ;
+    int numTimeouts;
+    int numIframes;
+    int numRetransmissions;
 } varStatistics;
 
-varStatistics stats;
+extern varStatistics stats;
 
 /* Cada State Machine permite detetar os diferentes tipos de tramas
  * 
@@ -90,6 +94,7 @@ int getBaud(int baud);
 void timeOut();
 void connectionConfig(linkLayer connectionParameters);
 void llcopy(linkLayer connectionParameters);
+void printstatistics ();
 
 /* For debugging only */
 void printFlags(unsigned char x);

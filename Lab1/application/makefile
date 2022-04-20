@@ -34,7 +34,7 @@ rx_png:
 	./app /dev/ttyS11 rx rubiks_cube_r.png
 
 rx_jpg:
-	./app /dev/ttyS11 tx Foto_CV_r.jpg
+	./app /dev/ttyS11 rx Foto_CV_r.jpg
 
 clear:
 	rm -f app a.out

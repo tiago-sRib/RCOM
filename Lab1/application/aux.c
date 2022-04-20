@@ -136,14 +136,14 @@ void createPkg(unsigned int type, unsigned char * pkg)
     case RR_pkg:
         pkg[0] = FLAG;
         pkg[1] = A;
-        pkg[2] = C_RR(r);
+        pkg[2] = C_RR(parity_bit);
         pkg[3] = A ^ pkg[2];
         pkg[4] = FLAG;
         break;
     case REJ_pkg:
         pkg[0] = FLAG;
         pkg[1] = A;
-        pkg[2] = C_REJ(r);
+        pkg[2] = C_REJ(parity_bit);
         pkg[3] = A ^ pkg[2];
         pkg[4] = FLAG;
         break;
@@ -357,7 +357,6 @@ int StateMachineDISC(unsigned char tx, int state)
     return state;
 }
 
-
 int StateMachineI(unsigned char tx, int state)
 {
     switch (state)
@@ -380,7 +379,7 @@ int StateMachineI(unsigned char tx, int state)
         break;
 
     case A_STATE:
-        if (tx == C_I(0) || tx == C_I(1))
+        if (tx == C_I(parity_bit))
             state = C_STATE;
 
         else if (tx == FLAG)
@@ -392,8 +391,11 @@ int StateMachineI(unsigned char tx, int state)
         break;
 
     case C_STATE:
-        if (tx == (A ^ C_I(1)) || tx == (A ^ C_I(0)) )
+        if (tx == (A ^ C_I(parity_bit)))
+        {
             state = BCC_STATE;
+            parity_bit = 1 - parity_bit;
+        }
         
         else if (tx == FLAG)
             state = FLAG_STATE;
@@ -446,12 +448,12 @@ int StateMachineRR_REJ(unsigned char tx, int state)
         break;
 
     case A_STATE:
-        if (tx == C_RR(0) || tx == C_RR(1))
+        if (tx == C_RR((1-parity_bit)))
             state = C_STATE;
-
-        else if (tx == C_REJ(0) || tx == C_REJ(1))
+            
+        else if (tx == C_REJ((1-parity_bit)))
             state = C_REJ_STATE;
-
+        
         else if (tx == FLAG)
             state = FLAG_STATE;
         
@@ -463,8 +465,11 @@ int StateMachineRR_REJ(unsigned char tx, int state)
 
     /********************RR frame***********************/
     case C_STATE:
-        if (tx == (A ^ C_RR(1)) || tx == (A ^ C_RR(0)) )
+        if (tx == (A ^ C_RR((1-parity_bit))))
+        {
             state = BCC_STATE;
+            parity_bit = 1 - parity_bit;
+        }
 
         else if (tx == FLAG)
             state = FLAG_STATE;
@@ -487,8 +492,11 @@ int StateMachineRR_REJ(unsigned char tx, int state)
     
     /*********************REJ frame**********************/
     case C_REJ_STATE:
-        if (tx == (A ^ C_REJ(1)) || tx == (A ^ C_REJ(0)) )
+        if (tx == (A ^ C_REJ((1-parity_bit))))
+        {
             state = BCC_REJ_STATE;
+            parity_bit = 1 - parity_bit;
+        }
         
         else if (tx == FLAG)
             state = FLAG_STATE;

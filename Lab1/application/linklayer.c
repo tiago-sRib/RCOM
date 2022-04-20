@@ -2,9 +2,12 @@
 #include "aux.h"
 
 int attempts=1, timeOutFLAG=1;
-static int fd;
+int fd;
 struct termios oldtio,newtio;
 linkLayer cP;
+int parity_bit = 0;
+
+varStatistics stats;
 
 void timeOut()
 {
@@ -29,6 +32,7 @@ int llopen(linkLayer connectionParameters)
         createPkg(SET_pkg, buf);
     
         (void) signal(SIGALRM, timeOut);
+        stats.numTimeouts--;
 
         while(attempts <= cP.numTries && state != STOP_STATE){
             
@@ -39,14 +43,16 @@ int llopen(linkLayer connectionParameters)
                 write(fd, buf, 5);
                 alarm(cP.timeOut);
                 timeOutFLAG = 0;
+
+                stats.numTimeouts++;
             }
             
             if(res > res_old)
             {
                 alarm(0);
                 state = StateMachineUA(b, state);
-                timeOutFLAG = 1;
-            }   
+                timeOutFLAG = 1;                
+            }
 
             res_old = res;
         }
@@ -90,13 +96,24 @@ int llwrite(char* buf, int bufSize)
     int size, state = START_STATE;
     ssize_t res = 0, res_old = 0;
    
-    s = r;
- 
     pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
 
+    //debugging
+    /*
+    if(pkg[2] == C_I(0))
+        printf("Ns(0)\n");
+
+    else if(pkg[2] == C_I(1))
+        printf("Ns(1)\n");
+
+    else printf("%x\n", pkg[2]);
+    */
+
+    stats.numTimeouts--;
     (void) signal(SIGALRM, timeOut);
-        
+
     attempts = timeOutFLAG = 1;
+    
     while(attempts <= cP.numTries && state != STOP_STATE)
     {    
         res += read(fd, &b, 1);
@@ -107,6 +124,9 @@ int llwrite(char* buf, int bufSize)
             //pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
             write(fd, pkg, size);
             state = START_STATE;
+
+            stats.numIframes++;
+            stats.numREJ++;
         }
 
         else if(res > res_old)
@@ -121,6 +141,11 @@ int llwrite(char* buf, int bufSize)
             write(fd, pkg, size);
             alarm(cP.timeOut);
             timeOutFLAG = 0;
+
+            stats.numTimeouts++;
+            stats.numIframes++;
+            if(stats.numIframes == 12)
+                printf("tamanho do frame: %d\n", size);
         }
         
         res_old = res;
@@ -165,11 +190,11 @@ int llread(char* packet)
     BCC2 = pkgRecieved[i-1];
     pkgSize = i - 1;
     
-    //stats.RecivedI++;
-
     deStuffSize = byte_destuffing(pkgRecieved, pkgSize, (unsigned char *) packet);
     BCC2_r = createBCC2((unsigned char *) packet, deStuffSize);
     
+    stats.numBytesFile += deStuffSize;
+
     if(BCC2 != BCC2_r)
     {
         createPkg(REJ_pkg, buf);
@@ -179,9 +204,19 @@ int llread(char* packet)
 
     else
     {
-        r = 1 - s;
         createPkg(RR_pkg, buf);
         write(fd, buf, 5);
+
+        //debugging
+        /*
+        if(buf[2] == C_RR(0))
+            printf("Nr(0)\n");
+
+        else if(buf[2] == C_RR(1))
+            printf("Nr(1)\n");
+
+        else printf("Completly wrong\n");
+        */
     }
     
     return deStuffSize;
@@ -199,8 +234,9 @@ int llclose(int showStatistics)
         createPkg(DISC_pkg, buf);
 
         (void) signal(SIGALRM, timeOut);
-
         attempts = timeOutFLAG = 1;
+        stats.numTimeouts--;
+
         while(attempts <= cP.numTries && state != STOP_STATE){
             
             res += read(fd, &b, 1);
@@ -210,6 +246,8 @@ int llclose(int showStatistics)
                 write(fd, buf, 5);
                 alarm(cP.timeOut);
                 timeOutFLAG = 0;
+
+                stats.numTimeouts++;
             }
 
             if(res > res_old)
@@ -264,6 +302,10 @@ int llclose(int showStatistics)
     }
 
     close(fd);
+
+    if(showStatistics)
+        printstatistics ();
+
     sleep(1);
     return 0;
 }
@@ -307,4 +349,18 @@ void connectionConfig(linkLayer connectionParameters)
       perror("tcsetattr");
       exit(-1);
     }
+}
+
+void printstatistics ()
+{
+    printf("\nStatistics: \n");
+
+    printf("Number of Bytes of the file stuffed: %d B\n", stats.numBytesStuff);
+    printf("Number of Bytes of the file recieved: %d B\n", stats.numBytesFile);
+    printf("Number of REJ frames: %d\n", stats.numREJ);
+    printf("Number of I frames sent: %d\n", stats.numIframes);
+    printf("Number of Timeouts: %d\n", stats.numTimeouts);
+    stats.numRetransmissions = stats.numREJ + stats.numTimeouts;
+    printf("Number of Retransmissions: %d\n", stats.numRetransmissions);
+
 }

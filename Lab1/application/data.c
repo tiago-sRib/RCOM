@@ -24,13 +24,15 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
     
     pkg[0] = FLAG;
     pkg[1] = A;
-    pkg[2] = C_I(s);
+    pkg[2] = C_I(parity_bit);
     pkg[3] = (A ^ pkg[2]);
     pkg[*finalSize - 2] = createBCC2(data, sizeData);
     pkg[*finalSize - 1] = FLAG; 
 
     byte_stuffing(data, sizeData, (pkg + 4));
     
+    stats.numBytesStuff += extraSize;
+
     // testar o rej    
     /*
     unsigned char val;
