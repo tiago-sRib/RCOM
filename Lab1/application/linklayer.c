@@ -122,6 +122,7 @@ int llwrite(char* buf, int bufSize)
         {
             //puts("Rej request recieved, sending pkg again");
             //pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
+            alarm(0);
             write(fd, pkg, size);
             state = START_STATE;
 
