@@ -119,13 +119,15 @@ int llwrite(char* buf, int bufSize)
         res += read(fd, &b, 1);
         
         if(state == STOP_REJ_STATE)
-        {
+        {   
             alarm(0);
             write(fd, pkg, size);
             state = START_STATE;
 
             stats.numIframes++;
             stats.numREJ++;
+
+            puts("Rej was triggered. A new package was sent");
         }
 
         else if(res > res_old)
@@ -143,8 +145,6 @@ int llwrite(char* buf, int bufSize)
 
             stats.numTimeouts++;
             stats.numIframes++;
-            if(stats.numIframes == 12)
-                printf("tamanho do frame: %d\n", size);
         }
         
         res_old = res;
@@ -200,6 +200,8 @@ int llread(char* packet)
     {
         createPkg(REJ_pkg, buf);
         write(fd, buf, 5);
+        
+        puts("Package rejected");
         return 0;
     }
 
@@ -210,7 +212,6 @@ int llread(char* packet)
         write(fd, buf, 5);
 
         //debugging
-        /*
         if(buf[2] == C_RR(0))
             printf("Nr(0)\n");
 
@@ -218,7 +219,7 @@ int llread(char* packet)
             printf("Nr(1)\n");
 
         else printf("Completly wrong\n");
-        */
+        
     }
     
     return deStuffSize;
