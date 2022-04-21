@@ -392,10 +392,7 @@ int StateMachineI(unsigned char tx, int state)
 
     case C_STATE:
         if (tx == (A ^ C_I(parity_bit)))
-        {
             state = BCC_STATE;
-            parity_bit = 1 - parity_bit;
-        }
         
         else if (tx == FLAG)
             state = FLAG_STATE;
@@ -466,10 +463,8 @@ int StateMachineRR_REJ(unsigned char tx, int state)
     /********************RR frame***********************/
     case C_STATE:
         if (tx == (A ^ C_RR((1-parity_bit))))
-        {
             state = BCC_STATE;
-            parity_bit = 1 - parity_bit;
-        }
+            
 
         else if (tx == FLAG)
             state = FLAG_STATE;
@@ -493,10 +488,8 @@ int StateMachineRR_REJ(unsigned char tx, int state)
     /*********************REJ frame**********************/
     case C_REJ_STATE:
         if (tx == (A ^ C_REJ((1-parity_bit))))
-        {
             state = BCC_REJ_STATE;
-            parity_bit = 1 - parity_bit;
-        }
+
         
         else if (tx == FLAG)
             state = FLAG_STATE;

@@ -120,8 +120,6 @@ int llwrite(char* buf, int bufSize)
         
         if(state == STOP_REJ_STATE)
         {
-            //puts("Rej request recieved, sending pkg again");
-            //pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
             alarm(0);
             write(fd, pkg, size);
             state = START_STATE;
@@ -152,6 +150,7 @@ int llwrite(char* buf, int bufSize)
         res_old = res;
     }   
     
+   
     if(attempts > cP.numTries)
     {
         puts("Number of tries exceded");
@@ -159,6 +158,7 @@ int llwrite(char* buf, int bufSize)
         exit(-1);
     }
 
+    parity_bit = 1 - parity_bit;
     free(pkg); 
     return 0;
 }
@@ -187,7 +187,7 @@ int llread(char* packet)
 
         res_old = res;
     }
-
+    
     BCC2 = pkgRecieved[i-1];
     pkgSize = i - 1;
     
@@ -204,7 +204,8 @@ int llread(char* packet)
     }
 
     else
-    {
+    {   
+        parity_bit = 1 - parity_bit;
         createPkg(RR_pkg, buf);
         write(fd, buf, 5);
 
@@ -341,7 +342,7 @@ void connectionConfig(linkLayer connectionParameters)
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
+    newtio.c_cc[VTIME]    = connectionParameters.timeOut * 10;   /* inter-character timer unused */
     newtio.c_cc[VMIN]     = 0;   /* blocking read until 1 chars received */
 
     tcflush(fd, TCIOFLUSH);
