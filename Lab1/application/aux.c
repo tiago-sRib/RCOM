@@ -1,57 +1,6 @@
 #include "linklayer.h"
 #include "aux.h"
 
-void printFlags(unsigned char x)
-{
-    switch (x)
-    {
-    case FLAG:
-        printf("FLAG");
-        break;
-    case BCC_DISC:
-        printf("BCC_DISC");
-        break;
-    case BCC_SET:
-        printf("BCC_SET");
-        break;
-    case BCC_UA:
-        printf("BCC_UA");
-        break;
-    case A:
-        printf("A\\C");
-        break;
-    case C_DISC:
-        printf("C_DISC");
-        break;
-    case C_UA:
-        printf("C_UA");
-        break;
-
-    default:
-        printf("%u*", x);
-        break;
-    }
-}
-
-void printInfoPkg(int size, unsigned char *pkg, unsigned char BCC2)
-{
-    for(int i = 0; i < size; i++)
-    {
-        if(pkg[i] == FLAG)  printf("[i:%d FLAG] ", i);
-
-        else if(pkg[i] == A)     printf("[i:%d A] ", i);
-
-        else if(pkg[i] == C_I(0) || pkg[i] == C_I(1) )    printf("[i:%d C] ", i);
-
-        else if(pkg[i] == (A^C_I(0)) || pkg[i] == (A^C_I(1)) ) printf("[i:%d BCC1] ", i);
-        
-        else if(pkg[i] == BCC2) printf("[i:%d BCC2] ", i);
-
-        else printf("[%u]", pkg[i]);
-    }
-    printf("\n");
-}
-
 int getBaud(int baud)
 {
     switch (baud)

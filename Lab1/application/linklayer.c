@@ -98,17 +98,6 @@ int llwrite(char* buf, int bufSize)
    
     pkg = createInfoPkg((unsigned char *)buf, bufSize, &size);
 
-    //debugging
-    /*
-    if(pkg[2] == C_I(0))
-        printf("Ns(0)\n");
-
-    else if(pkg[2] == C_I(1))
-        printf("Ns(1)\n");
-
-    else printf("%x\n", pkg[2]);
-    */
-
     stats.numTimeouts--;
     (void) signal(SIGALRM, timeOut);
 
@@ -127,7 +116,7 @@ int llwrite(char* buf, int bufSize)
             stats.numIframes++;
             stats.numREJ++;
 
-            puts("Rej was triggered. A new package was sent");
+            puts("Retransmiting...");
         }
 
         else if(res > res_old)
@@ -210,16 +199,6 @@ int llread(char* packet)
         parity_bit = 1 - parity_bit;
         createPkg(RR_pkg, buf);
         write(fd, buf, 5);
-
-        //debugging
-        if(buf[2] == C_RR(0))
-            printf("Nr(0)\n");
-
-        else if(buf[2] == C_RR(1))
-            printf("Nr(1)\n");
-
-        else printf("Completly wrong\n");
-        
     }
     
     return deStuffSize;
@@ -330,7 +309,7 @@ void connectionConfig(linkLayer connectionParameters)
     }
 
     if ( tcgetattr(fd,&oldtio) == -1) 
-    {                               /* save current port settings */
+    {                              
       perror("tcgetattr");
       exit(-1);
     }
@@ -365,5 +344,4 @@ void printstatistics ()
     printf("Number of Timeouts: %d\n", stats.numTimeouts);
     stats.numRetransmissions = stats.numREJ + stats.numTimeouts;
     printf("Number of Retransmissions: %d\n", stats.numRetransmissions);
-
 }

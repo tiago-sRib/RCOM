@@ -1,8 +1,6 @@
 #ifndef AUX
 #define AUX
 
-#include <time.h>
-
 #define FLAG 0x7E
 #define ESC 0x7d
 #define STUFF 0x20
@@ -55,10 +53,11 @@ typedef struct stats
 
 extern varStatistics stats;
 
-/* Cada State Machine permite detetar os diferentes tipos de tramas
+/* 
+ * Cada State Machine permite detetar os diferentes tipos de tramas, respetivamente
  * 
- * Todas as maquinas de estado dao return do novo estado correspondente
- * ao byte tx fornecido
+ * Para usar este tipo de funcoes, devera ser fornecido, atraves da variavel tx, o
+ * byte que esta a ser lido nesse momento, bem como o estado atual  
  */
 int StateMachineUA(unsigned char tx, int state);
 int StateMachineDISC(unsigned char tx, int state);
@@ -67,11 +66,13 @@ int StateMachineUA2(unsigned char tx, int state);
 int StateMachineRR_REJ(unsigned char tx, int state);
 int StateMachineI(unsigned char tx, int state);
 
-/* retorna em apontador o package criado
- * 
- * Nota: No caso da trama RR o valor do Control Field e' fornecido atraves das 
- * variaveis globais dos bits de paridade. Nesse caso e´ necessario estabelecer 
- * corretamente a paridade antes de a executar.
+/* 
+ * Escreve em pkg o tipo de pacote especificado em "type" (nao aplicavel 
+ * para a trama de informacao)
+ *
+ * No caso dos bits de paridade, esta funcao limita-se apenas a utilizar
+ * o valor que da variavel global "parity_bit" em vigor nesse momento, sendo
+ * necessario defini-lo corretamente antes de efetucar a sua chamada
  */
 void createPkg(unsigned int type, unsigned char * pkg);
 
@@ -94,9 +95,6 @@ int getBaud(int baud);
 void timeOut();
 void connectionConfig(linkLayer connectionParameters);
 void llcopy(linkLayer connectionParameters);
-void printstatistics ();
+void printstatistics();
 
-/* For debugging only */
-void printFlags(unsigned char x);
-void printInfoPkg(int size, unsigned char *pkg, unsigned char BCC2);
 #endif
