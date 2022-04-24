@@ -463,3 +463,38 @@ int StateMachineRR_REJ(unsigned char tx, int state)
 
     return state;
 }
+
+
+/* for debugging only */
+void printFlags(unsigned char x)
+{
+    switch (x)
+    {
+    case FLAG:
+        printf("FLAG");
+        break;
+
+    default:
+        printf("%x", x);
+        break;
+    }
+}
+
+void printInfoPkg(int size, unsigned char *pkg, unsigned char BCC2)
+{
+    for(int i = 0; i < size; i++)
+    {
+        if(pkg[i] == FLAG)  printf("[i:%d FLAG] ", i);
+
+        else if(pkg[i] == A)     printf("[i:%d A] ", i);
+
+        else if(pkg[i] == C_I(0) || pkg[i] == C_I(1) )    printf("[i:%d C] ", i);
+
+        else if(pkg[i] == (A^C_I(0)) || pkg[i] == (A^C_I(1)) ) printf("[i:%d BCC1] ", i);
+        
+        else if(pkg[i] == BCC2) printf("[i:%d BCC2] ", i);
+
+        else printf("[%u]", pkg[i]);
+    }
+    printf("\n");
+}

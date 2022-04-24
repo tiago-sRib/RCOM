@@ -32,23 +32,19 @@ unsigned char * createInfoPkg(unsigned char * data, int sizeData, int* finalSize
     byte_stuffing(data, sizeData, (pkg + 4));
     
     stats.numBytesStuff += extraSize;
+  
+    /*  used to virtually generate erros, and test REJ
 
-    // testar o rej    
-    /*
     unsigned char val;
     int randPos[10];
-    if(cc > 0)
+    for(int i = 0; i < 10; i++)
     {
-        for(int i = 0; i < 10; i++)
-        {
-            randPos[i] = rand() % sizeData;
-            if(randPos[i] < 4) randPos[i] += 4;
-            val = rand();
-            pkg[randPos[i]] = val;
-            printf("%d: Pkg[%d] = %u\n", i, randPos[i], val);
-        }
-        cc--;
-    }  
+        randPos[i] = rand() % sizeData;
+        if(randPos[i] < 4) randPos[i] += 4;
+        val = rand();
+        pkg[randPos[i]] = val;
+        printf("%d: Pkg[%d] = %u\n", i, randPos[i], val);
+    }
     */
 
     return pkg;

@@ -1,6 +1,9 @@
 #ifndef AUX
 #define AUX
 
+//used for debugging
+//#include <time.h>
+
 #define FLAG 0x7E
 #define ESC 0x7d
 #define STUFF 0x20
@@ -97,4 +100,7 @@ void connectionConfig(linkLayer connectionParameters);
 void llcopy(linkLayer connectionParameters);
 void printstatistics();
 
+/* For debugging only */
+void printFlags(unsigned char x);
+void printInfoPkg(int size, unsigned char *pkg, unsigned char BCC2);
 #endif
