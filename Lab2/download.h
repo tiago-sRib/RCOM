@@ -25,6 +25,9 @@ typedef struct requested_data{
 
 void parse_input(char *arg, requestedData * data);
 void print_data_struct(requestedData * data);
+
+int socket_config (char *ip, int port);
+
 struct hostent *getIP(requestedData data);
 
 #endif
