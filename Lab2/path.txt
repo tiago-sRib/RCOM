@@ -1,3 +1,0 @@
-mnt/c/Users/pedro/OneDrive/"Ambiente de Trabalho"/FEUP/"3º Ano"/"2º Semestre"/RC/Trabalhos_Lab/Trabalho2/code
-
-ftp://ftp.up.pt/pub/gnu/GNUinfo/Audio/index.txt
